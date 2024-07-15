@@ -159,23 +159,24 @@ VL53LX_Error VL53LX::VL53LX_I2CWrite(uint8_t DeviceAddr, uint16_t RegisterAddr, 
   printf("Beginning transmission to %d\nWriting port number %d\n", addr, RegisterAddr);
 #endif
 
-  uint8_t buffer[2];
-  buffer[0] = (uint8_t)(RegisterAddr >> 8);
-  buffer[1] = (uint8_t)(RegisterAddr & 0xFF);
+  uint8_t _buf[256 + 2], *pbuf;
+  bool allocated = false;
+  if (NumByteToWrite > 256) {
+    pbuf = new uint8_t[NumByteToWrite + 2];
+    allocated = true;
+  } else {
+    pbuf = _buf;
+  }
 
-  // transactional
-  uint8_t* buf = new uint8_t[NumByteToWrite + 2];
+  pbuf[0] = (uint8_t)(RegisterAddr >> 8);
+  pbuf[1] = (uint8_t)(RegisterAddr & 0xFF);
 
-  buf[0] = buffer[0];
-  buf[1] = buffer[1];
-  memcpy(buf + 2, pBuffer, NumByteToWrite);
+  memcpy(pbuf + 2, pBuffer, NumByteToWrite);
 
-  i2c_write_blocking(dev_i2c, addr, buf, NumByteToWrite + 2, false);
+  i2c_write_blocking(dev_i2c, addr, pbuf, NumByteToWrite + 2, false);
 
-  // i2c_write_blocking(dev_i2c, addr, buffer, 2, true);
-  // i2c_write_blocking(dev_i2c, addr, pBuffer, NumByteToWrite, false);
-
-  delete[] buf;
+  if (allocated)
+    delete[] pbuf;
 
   return 0;
 }
