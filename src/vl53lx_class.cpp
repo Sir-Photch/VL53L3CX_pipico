@@ -37,9 +37,14 @@
 
 /* Includes */
 #include <stdlib.h>
-#include "Arduino.h"
 #include "vl53lx_class.h"
+#include "pico/stdlib.h"
 
+// #define I2CADDR(devaddr) ((uint8_t)(((devaddr) >> 1) & 0x7F))
+// #define REGADDR(buf, reg) do { \
+//   buf[0] = (uint8_t)(reg >> 8); \
+//   buf[1] = (uint8_t)(reg & 0xFF); \
+// } while (0)
 
 /* Write and read functions from I2C */
 
@@ -149,25 +154,29 @@ VL53LX_Error VL53LX::VL53LX_UpdateByte(VL53LX_DEV Dev, uint16_t index, uint8_t A
 
 VL53LX_Error VL53LX::VL53LX_I2CWrite(uint8_t DeviceAddr, uint16_t RegisterAddr, uint8_t *pBuffer, uint16_t NumByteToWrite)
 {
+  uint8_t addr = ((uint8_t)(((DeviceAddr) >> 1) & 0x7F));
 #ifdef DEBUG_MODE
-  Serial.print("Beginning transmission to ");
-  Serial.println(((DeviceAddr) >> 1) & 0x7F);
-#endif
-  dev_i2c->beginTransmission(((uint8_t)(((DeviceAddr) >> 1) & 0x7F)));
-#ifdef DEBUG_MODE
-  Serial.print("Writing port number ");
-  Serial.println(RegisterAddr);
+  printf("Beginning transmission to %d\nWriting port number %d\n", addr, RegisterAddr);
 #endif
 
   uint8_t buffer[2];
   buffer[0] = (uint8_t)(RegisterAddr >> 8);
   buffer[1] = (uint8_t)(RegisterAddr & 0xFF);
-  dev_i2c->write(buffer, 2);
-  for (uint16_t i = 0 ; i < NumByteToWrite ; i++) {
-    dev_i2c->write(pBuffer[i]);
-  }
 
-  dev_i2c->endTransmission(true);
+  // transactional
+  uint8_t* buf = new uint8_t[NumByteToWrite + 2];
+
+  buf[0] = buffer[0];
+  buf[1] = buffer[1];
+  memcpy(buf + 2, pBuffer, NumByteToWrite);
+
+  i2c_write_blocking(dev_i2c, addr, buf, NumByteToWrite + 2, false);
+
+  // i2c_write_blocking(dev_i2c, addr, buffer, 2, true);
+  // i2c_write_blocking(dev_i2c, addr, pBuffer, NumByteToWrite, false);
+
+  delete[] buf;
+
   return 0;
 }
 
@@ -175,21 +184,15 @@ VL53LX_Error VL53LX::VL53LX_I2CRead(uint8_t DeviceAddr, uint16_t RegisterAddr, u
 {
   int status = 0;
   //Loop until the port is transmitted correctly
+  uint8_t addr = ((uint8_t)(((DeviceAddr) >> 1) & 0x7F));
   do {
 #ifdef DEBUG_MODE
-    Serial.print("Beginning transmission to ");
-    Serial.println(((DeviceAddr) >> 1) & 0x7F);
-#endif
-    dev_i2c->beginTransmission(((uint8_t)(((DeviceAddr) >> 1) & 0x7F)));
-#ifdef DEBUG_MODE
-    Serial.print("Writing port number ");
-    Serial.println(RegisterAddr);
+    printf("Beginning transmission to %d\nWriting port number %d\n", addr, RegisterAddr);
 #endif
     uint8_t buffer[2];
     buffer[0] = (uint8_t)(RegisterAddr >> 8);
     buffer[1] = (uint8_t)(RegisterAddr & 0xFF);
-    dev_i2c->write(buffer, 2);
-    status = dev_i2c->endTransmission(false);
+    status = i2c_write_blocking(dev_i2c, addr, buffer, 2, false);
     //Fix for some STM32 boards
     //Reinitialize th i2c bus with the default parameters
 #ifdef ARDUINO_ARCH_STM32
@@ -199,15 +202,9 @@ VL53LX_Error VL53LX::VL53LX_I2CRead(uint8_t DeviceAddr, uint16_t RegisterAddr, u
     }
 #endif
     //End of fix
-  } while (status != 0);
+  } while (status < 0);
 
-  dev_i2c->requestFrom(((uint8_t)(((DeviceAddr) >> 1) & 0x7F)), (byte) NumByteToRead);
-
-  int i = 0;
-  while (dev_i2c->available()) {
-    pBuffer[i] = dev_i2c->read();
-    i++;
-  }
+  i2c_read_blocking(dev_i2c, addr, pBuffer, NumByteToRead, false);
 
   return 0;
 }
@@ -232,7 +229,7 @@ VL53LX_Error VL53LX::VL53LX_GetTickCount(
 VL53LX_Error VL53LX::VL53LX_WaitUs(VL53LX_Dev_t *pdev, int32_t wait_us)
 {
   (void)pdev;
-  delay(wait_us / 1000);
+  sleep_us(wait_us);
   return VL53LX_ERROR_NONE;
 }
 
@@ -240,7 +237,7 @@ VL53LX_Error VL53LX::VL53LX_WaitUs(VL53LX_Dev_t *pdev, int32_t wait_us)
 VL53LX_Error VL53LX::VL53LX_WaitMs(VL53LX_Dev_t *pdev, int32_t wait_ms)
 {
   (void)pdev;
-  delay(wait_ms);
+  sleep_ms(wait_ms);
   return VL53LX_ERROR_NONE;
 }
 

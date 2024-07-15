@@ -8344,8 +8344,7 @@ typedef struct {
 /*vl53lx_platform_user_data*/
 
 #include <stdlib.h>
-#include "Wire.h"
-
+#include "hardware/i2c.h"
 
 typedef struct {
   VL53LX_DevData_t   Data;
@@ -8353,7 +8352,7 @@ typedef struct {
   uint8_t   i2c_slave_address;
   uint8_t   comms_type;
   uint16_t  comms_speed_khz;
-  TwoWire *I2cHandle;
+  i2c_inst_t *I2cHandle;
   uint8_t   I2cDevAddr;
   int     Present;
   int   Enabled;

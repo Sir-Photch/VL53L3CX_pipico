@@ -38,10 +38,10 @@
 #endif
 
 /* Includes ------------------------------------------------------------------*/
-#include "Arduino.h"
 #include "RangeSensor.h"
 #include "vl53lx_def.h"
-#include <Wire.h>
+#include "hardware/i2c.h"
+#include "hardware/gpio.h"
 
 #define VL53LX_DEFAULT_DEVICE_ADDRESS           0x52
 
@@ -102,7 +102,7 @@ class VL53LX : public RangeSensor {
      * @param[in] i2c device I2C to be used for communication
      * @param[in] pin shutdown pin to be used as component GPIO0
      */
-    VL53LX(TwoWire *i2c, int pin) : RangeSensor(), dev_i2c(i2c), gpio0(pin)
+    VL53LX(i2c_inst_t *i2c, int pin) : RangeSensor(), dev_i2c(i2c), gpio0(pin)
     {
       Dev = &MyDevice;
       memset((void *)Dev, 0x0, sizeof(VL53LX_Dev_t));
@@ -120,7 +120,7 @@ class VL53LX : public RangeSensor {
     virtual int begin()
     {
       if (gpio0 >= 0) {
-        pinMode(gpio0, OUTPUT);
+        gpio_set_dir(gpio0, GPIO_OUT);
       }
       return 0;
     }
@@ -128,7 +128,7 @@ class VL53LX : public RangeSensor {
     virtual int end()
     {
       if (gpio0 >= 0) {
-        pinMode(gpio0, INPUT);
+        gpio_set_dir(gpio0, GPIO_IN);
       }
       return 0;
     }
@@ -143,9 +143,9 @@ class VL53LX : public RangeSensor {
     virtual void VL53LX_On(void)
     {
       if (gpio0 >= 0) {
-        digitalWrite(gpio0, HIGH);
+        gpio_pull_up(gpio0);
       }
-      delay(10);
+      sleep_ms(10);
     }
 
     /**
@@ -156,9 +156,9 @@ class VL53LX : public RangeSensor {
     virtual void VL53LX_Off(void)
     {
       if (gpio0 >= 0) {
-        digitalWrite(gpio0, LOW);
+        gpio_pull_down(gpio0);
       }
-      delay(10);
+      sleep_ms(10);
     }
 
     /**
@@ -3539,7 +3539,7 @@ class VL53LX : public RangeSensor {
   protected:
 
     /* IO Device */
-    TwoWire *dev_i2c;
+    i2c_inst_t *dev_i2c;
     /* Digital out pin */
     int gpio0;
     /* Device data */
